@@ -53,7 +53,7 @@ run_shell() {
 
   run_shell "NPU Device Nodes" 'ls -l /dev/davinci* /dev/davinci_manager /dev/hisi_hdc /dev/devmm_svm 2>/dev/null || true'
   run_shell "NPU SMI" 'command -v npu-smi; npu-smi info 2>/dev/null || true'
-  run_shell "NPU SMI Detail" 'npu-smi info -t board 2>/dev/null || true; npu-smi info -t usages 2>/dev/null || true'
+  run_shell "NPU SMI Detail" 'for i in 0 1 2 3 4 5 6 7; do npu-smi info -i "$i" -t board 2>/dev/null || true; npu-smi info -i "$i" -t usages 2>/dev/null || true; done'
 
   run_shell "Compiler And Build Tools" 'for c in gcc g++ clang clang++ cmake make ninja python python3 pip pip3 atc msprof aclprof ascendc ccec; do printf "%-10s " "$c"; command -v "$c" || true; done'
   run_shell "Tool Versions" 'python3 --version 2>&1 || true; gcc --version 2>&1 | head -1 || true; g++ --version 2>&1 | head -1 || true; cmake --version 2>&1 | head -1 || true; atc --version 2>&1 || true; msprof --version 2>&1 || true'
@@ -61,11 +61,32 @@ run_shell() {
 import importlib.util
 for name in ["numpy", "pandas", "matplotlib", "acl", "torch"]:
     spec = importlib.util.find_spec(name)
-    print(f"{name}: {'yes' if spec else 'no'}")
+    print(f"{name}: {\"yes\" if spec else \"no\"}")
 PY'
 
   run_shell "Git State" 'git rev-parse --show-toplevel 2>/dev/null; git status --short --branch 2>/dev/null || true; git log --oneline -1 2>/dev/null || true'
-} | tee "$OUT_FILE"
+} > "$OUT_FILE"
 
-printf '\nWrote environment snapshot: %s\n' "$OUT_FILE"
-
+printf 'Wrote full environment snapshot:\n  %s\n\n' "$OUT_FILE"
+printf 'Quick summary:\n'
+printf '  OS: '
+grep -m1 '^PRETTY_NAME=' /etc/os-release 2>/dev/null | cut -d= -f2- | tr -d '"' || true
+printf '  Kernel/arch: '
+uname -rmo 2>/dev/null || true
+printf '  NPU device nodes: '
+find /dev -maxdepth 1 -name 'davinci[0-9]*' 2>/dev/null | wc -l | tr -d ' '
+printf '\n'
+printf '  npu-smi: '
+command -v npu-smi 2>/dev/null || printf 'not found'
+printf '\n'
+printf '  CANN dirs: '
+find /usr/local/Ascend -maxdepth 1 -type d -name 'cann-*' 2>/dev/null | xargs -n1 basename 2>/dev/null | tr '\n' ' '
+printf '\n'
+printf '  Build tools: '
+for c in gcc g++ cmake make ninja python3 atc msprof; do
+  if command -v "$c" >/dev/null 2>&1; then
+    printf '%s ' "$c"
+  fi
+done
+printf '\n\n'
+printf 'Paste the snapshot file content only when detailed diagnosis is needed.\n'
