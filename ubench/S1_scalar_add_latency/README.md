@@ -7,11 +7,22 @@
 - Priority: core
 - Pattern: dependency_chain
 
+## Current Status
+
+This directory currently contains the first Ascend C build smoke test for the
+Lab2 benchmark suite. It builds a minimal custom AICore operator named
+`ScalarAddLatency`.
+
+This is not a valid S1 cycle measurement yet. Its job is to verify that the
+remote Ascend host can compile our repository-local CANN/Ascend C project.
+After this build chain is confirmed, the kernel will be replaced by a true
+scalar dependency-chain benchmark.
+
 ## Design
 
-- What to measure: TODO
-- How to measure: TODO
-- Why this isolates the target component: TODO
+- What to measure: S1 will measure scalar add latency in cycles.
+- How to measure: the final version should execute a long dependency chain and divide elapsed cycles by the chain length.
+- Why this isolates the target component: the dependency chain should prevent instruction-level overlap and expose single-operation latency.
 
 ## Parameters To Sweep
 
@@ -33,7 +44,7 @@ Required fields follow `data/raw/measurements_template.csv`.
 ## Run
 
 ```bash
-# TODO: replace with the actual Ascend environment command.
+bash ../../scripts/run_one.sh S1
 ```
 
 ## Notes

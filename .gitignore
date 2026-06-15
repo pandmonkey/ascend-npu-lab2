@@ -14,6 +14,7 @@ __pycache__/
 
 # Build/output artifacts
 build/
+build_out/
 dist/
 tmp/
 *.o
