@@ -24,6 +24,8 @@ tmp/
 # Generated report/package artifacts
 *.zip
 report/*.pdf
+docs/env_snapshots/
+data/processed/run_logs/
 
 # Keep raw templates in git, but avoid accidentally committing large run dumps.
 data/raw/*.bin

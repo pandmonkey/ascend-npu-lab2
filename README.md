@@ -13,7 +13,8 @@
 ├── 作业要求提取.md
 ├── docs/
 │   ├── benchmark_manifest.csv
-│   └── preparation_plan.md
+│   ├── preparation_plan.md
+│   └── remote_workflow.md
 ├── ubench/
 │   ├── README.md
 │   ├── S1_scalar_add_latency/
@@ -25,6 +26,9 @@
 │   └── processed/
 ├── scripts/
 │   ├── init_ubench_readmes.py
+│   ├── probe_ascend_env.sh
+│   ├── run_all.sh
+│   ├── run_one.sh
 │   ├── summarize_results.py
 │   └── validate_project.py
 └── report/
@@ -62,3 +66,21 @@ python3 scripts/init_ubench_readmes.py
 python3 scripts/validate_project.py
 python3 scripts/summarize_results.py
 ```
+
+## 远端机器工作流
+
+进入远端：
+
+```bash
+ssh pdc-ascend
+```
+
+第一次进入后：
+
+```bash
+git clone git@github.com:pandmonkey/ascend-npu-lab2.git
+cd ascend-npu-lab2
+bash scripts/probe_ascend_env.sh
+```
+
+远端详细流程见 [docs/remote_workflow.md](docs/remote_workflow.md)。
