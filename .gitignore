@@ -1,0 +1,31 @@
+# OS/editor noise
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Python cache
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Build/output artifacts
+build/
+dist/
+tmp/
+*.o
+*.so
+*.a
+*.log
+
+# Generated report/package artifacts
+*.zip
+report/*.pdf
+
+# Keep raw templates in git, but avoid accidentally committing large run dumps.
+data/raw/*.bin
+data/raw/*.npy
+data/raw/*.npz

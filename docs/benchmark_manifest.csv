@@ -1,0 +1,23 @@
+id,category,name,unit,priority,ubench_dir,measurement_pattern,notes
+S1,Scalar Unit,标量算术指令延迟,cycles,core,S1_scalar_add_latency,dependency_chain,标量加法依赖链；用总周期除以迭代次数估算单条延迟
+S2,Scalar Unit,标量单元吞吐率,ops/cycle,normal,S2_scalar_add_throughput,independent_streams,多条独立标量加法流；改变并行链数量观察吞吐饱和
+S3,Scalar Unit,标量访存延迟,cycles,normal,S3_scalar_memory_latency,pointer_chasing,标量 load/store 依赖链；重点避免编译器优化和预取影响
+V1,Vector Unit,FP32 向量加法延迟,cycles,core,V1_fp32_vector_add_latency,dependency_chain,FP32 vector add 依赖链；总周期除以向量指令次数
+V2,Vector Unit,FP32 向量乘法延迟,cycles,core,V2_fp32_vector_mul_latency,dependency_chain,FP32 vector mul 依赖链；与 V1 使用相同计时框架
+V3,Vector Unit,向量单元吞吐率,ops/cycle,normal,V3_vector_add_throughput,independent_streams,多条独立向量加法流；按 ops/cycle 统计
+V4,Vector Unit,向量单元流水线深度,条,normal,V4_vector_pipeline_depth,latency_vs_independent_chains,增加独立链数量直到吞吐不再提升，估算流水线可容纳指令数
+V5,Vector Unit,向量寄存器访问延迟,cycles,normal,V5_vector_register_latency,read_write_dependency_chain,分别构造读后写、写后读等相关链，区分读写延迟
+C1,Cube Unit,矩阵乘延迟（单 tile）,cycles,core,C1_cube_tile_matmul_latency,single_tile_latency,固定最小 tile，例如 16x16；测一次 tile matmul 发射到完成周期
+C2,Cube Unit,矩阵乘吞吐率,MAC/s,normal,C2_cube_matmul_throughput,streaming_matmul,大规模连续 matmul 使 Cube 饱和；统计 MAC/s 或 TFLOPS
+C3,Cube Unit,矩阵乘流水线深度,条,normal,C3_cube_pipeline_depth,latency_vs_independent_tiles,增加独立 tile matmul 数量，观察吞吐饱和点
+C4,Cube Unit,L0A/L0B/L0C 访问延迟,cycles,normal,C4_l0abc_access_latency,buffer_access_chain,分别测 L0A、L0B、L0C 读写延迟
+C5,Cube Unit,不同规模矩阵乘延迟缩放关系,-,normal,C5_matmul_scaling,size_sweep,扫 M/N/K 规模并画延迟折线图
+M1,MTE,L1 Buffer 读取带宽,GB/s,core,M1_l1_read_bandwidth,streaming_bandwidth,连续读 L1，逐步增大数据量直到带宽饱和
+M2,MTE,L1 Buffer 写入带宽,GB/s,core,M2_l1_write_bandwidth,streaming_bandwidth,连续写 L1，逐步增大数据量直到带宽饱和
+M3,MTE,L0A 带宽,GB/s,normal,M3_l0a_bandwidth,streaming_bandwidth,L0A 读写带宽；需要明确方向
+M4,MTE,L0B 带宽,GB/s,normal,M4_l0b_bandwidth,streaming_bandwidth,L0B 读写带宽；需要明确方向
+M5,MTE,L0C 带宽,GB/s,normal,M5_l0c_bandwidth,streaming_bandwidth,L0C 读写带宽；需要明确方向
+M6,MTE,DDR/HBM 访存延迟,cycles,normal,M6_hbm_memory_latency,pointer_chasing,片外内存首字延迟；随机 pointer chasing 避免连续带宽掩盖延迟
+M7,MTE,各级 Buffer 容量,KB/MB,normal,M7_buffer_capacity,working_set_sweep,扫工作集大小，观察延迟或带宽拐点估算容量
+M8,MTE,数据搬运启动开销,cycles,normal,M8_mte_startup_overhead,transfer_size_intercept,扫小数据 DMA 传输大小，用线性拟合截距估算启动开销
+

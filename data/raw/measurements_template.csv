@@ -1,0 +1,2 @@
+parameter_id,run_id,benchmark_dir,device_model,device_id,aicore_id,cann_version,driver_version,variant,problem_size,loop_count,warmup_count,repeat_index,elapsed_cycles,elapsed_us,bytes_moved,operations,measured_value,unit,notes
+
