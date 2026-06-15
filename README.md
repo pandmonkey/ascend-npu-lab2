@@ -27,6 +27,8 @@
 ├── scripts/
 │   ├── init_ubench_readmes.py
 │   ├── probe_ascend_env.sh
+│   ├── setup_env.sh
+│   ├── inspect_ascend_templates.sh
 │   ├── run_all.sh
 │   ├── run_one.sh
 │   ├── summarize_results.py
@@ -81,6 +83,7 @@ ssh pdc-ascend
 git clone git@github.com:pandmonkey/ascend-npu-lab2.git
 cd ascend-npu-lab2
 bash scripts/probe_ascend_env.sh
+bash scripts/inspect_ascend_templates.sh
 ```
 
 远端详细流程见 [docs/remote_workflow.md](docs/remote_workflow.md)。

@@ -5,6 +5,8 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MANIFEST="$ROOT_DIR/docs/benchmark_manifest.csv"
 LOG_DIR="$ROOT_DIR/data/processed/run_logs"
 mkdir -p "$LOG_DIR"
+# shellcheck source=setup_env.sh
+source "$ROOT_DIR/scripts/setup_env.sh"
 
 ONLY_CORE=0
 if [[ "${1:-}" == "--core" ]]; then

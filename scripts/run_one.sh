@@ -3,6 +3,8 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MANIFEST="$ROOT_DIR/docs/benchmark_manifest.csv"
+# shellcheck source=setup_env.sh
+source "$ROOT_DIR/scripts/setup_env.sh"
 
 usage() {
   cat <<'EOF'
@@ -67,4 +69,3 @@ else
   echo "not implemented: expected executable run.sh or build_and_run.sh under $BENCH_DIR_NAME" >&2
   exit 10
 fi
-

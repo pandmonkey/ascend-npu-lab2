@@ -2,6 +2,8 @@
 set -u
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=setup_env.sh
+source "$ROOT_DIR/scripts/setup_env.sh" >/dev/null 2>&1 || true
 OUT_DIR="$ROOT_DIR/docs/env_snapshots"
 mkdir -p "$OUT_DIR"
 

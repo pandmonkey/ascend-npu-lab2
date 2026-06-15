@@ -20,6 +20,7 @@ ssh pdc-ascend
 git clone git@github.com:pandmonkey/ascend-npu-lab2.git
 cd ascend-npu-lab2
 bash scripts/probe_ascend_env.sh
+bash scripts/inspect_ascend_templates.sh
 ```
 
 如果远端没有配置 GitHub SSH key，可以先用 HTTPS：
@@ -42,6 +43,30 @@ docs/env_snapshots/env_snapshot_YYYYmmdd_HHMMSS.txt
 cd ~/ascend-npu-lab2
 git pull
 ```
+
+## CANN 环境
+
+脚本默认加载：
+
+```bash
+/usr/local/Ascend/cann-9.0.0/set_env.sh
+```
+
+如果课程机器切换到其他 CANN 版本，可以用环境变量覆盖：
+
+```bash
+export ASCEND_CANN_PATH=/usr/local/Ascend/cann-8.5.0
+bash scripts/probe_ascend_env.sh
+```
+
+当前远端已确认存在：
+
+- `/usr/local/Ascend/cann-9.0.0/aarch64-linux/asc/include/kernel_operator.h`
+- `/usr/local/Ascend/cann-9.0.0/aarch64-linux/tikcpp/ascendc_kernel_cmake/ascendc.cmake`
+- `/usr/local/Ascend/cann-9.0.0/tools/op_project_templates/op_project_tmpl/build.sh`
+- `/usr/local/Ascend/cann-9.0.0/tools/new_op_project_template/custom_op/build.sh`
+
+`which ascendc` 找不到是正常的；Ascend C 不是一个叫 `ascendc` 的单独命令，主要通过 `ccec`、CMake 模块、头文件和工程模板使用。
 
 ## 运行单个参数
 
@@ -110,4 +135,3 @@ git push
 ```
 
 不要直接提交 `docs/env_snapshots/`，除非你确认里面没有敏感信息。
-
