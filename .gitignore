@@ -32,3 +32,7 @@ data/processed/run_logs/
 data/raw/*.bin
 data/raw/*.npy
 data/raw/*.npz
+ubench/kernels/build/
+ubench/kernels/ubench_host
+ubench/kernels/query_platform
+report/report.ps

@@ -1,41 +1,16 @@
 # M4 L0B 带宽
 
 ## Measurement Target
-
 - Category: MTE
 - Unit: GB/s
 - Priority: normal
 - Pattern: streaming_bandwidth
+- Source code: `ubench/kernels/op_kernel/ubench.cpp` (mode=L0B 读写带宽)
 
 ## Design
-
-- What to measure: TODO
-- How to measure: TODO
-- Why this isolates the target component: TODO
-
-## Parameters To Sweep
-
-- Problem size: TODO
-- Loop count: TODO
-- Number of independent dependency chains or streams: TODO
-- Warmup count and repeat count: TODO
-
-## Output
-
-Append raw records to:
-
-```text
-data/raw/measurements.csv
-```
-
-Required fields follow `data/raw/measurements_template.csv`.
-
-## Run
-
-```bash
-# TODO: replace with the actual Ascend environment command.
-```
+- **测什么**：L0B缓冲区读写带宽 (GB/s)
+- **怎么测**：GM→UB DataCopy作为L0B带宽代理
+- **运行**：`cd ubench/kernels && bash run.sh M4`
 
 ## Notes
-
 L0B 读写带宽；需要明确方向

@@ -1,18 +1,15 @@
 # Remote Ascend Workflow
 
-远端机器入口：
+> **更新：本实验实际在 Ascend 910B 机器上直接运行（非远程 SSH）。** 以下为实际工作流。
 
-```bash
-ssh pdc-ascend
-```
+## 环境
 
-当前已知登录后信息：
+当前运行环境即为 Ascend 910B 机器：
 
-- OS：openEuler 22.03 SP4
-- Kernel：5.10.0-216.0.0.115.oe2203sp4.aarch64
-- 架构：aarch64
-- 远端用户：`u2300013126`
-- 机器在线用户可能较多，系统 load 可能偏高；benchmark 运行时必须记录环境和负载。
+- OS：openEuler 22.03 SP4, aarch64
+- CANN：9.0.0（`/usr/local/Ascend/cann-9.0.0`）
+- 设备：Ascend910_9362，16+ NPU
+- 用户：`u2300013126`
 
 ## 第一次进入机器
 

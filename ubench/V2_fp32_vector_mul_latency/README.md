@@ -1,41 +1,17 @@
 # V2 FP32 向量乘法延迟
 
 ## Measurement Target
-
 - Category: Vector Unit
 - Unit: cycles
 - Priority: core
 - Pattern: dependency_chain
+- Source code: `ubench/kernels/op_kernel/ubench.cpp` (mode=FP32 vector mul 依赖链)
 
 ## Design
-
-- What to measure: TODO
-- How to measure: TODO
-- Why this isolates the target component: TODO
-
-## Parameters To Sweep
-
-- Problem size: TODO
-- Loop count: TODO
-- Number of independent dependency chains or streams: TODO
-- Warmup count and repeat count: TODO
-
-## Output
-
-Append raw records to:
-
-```text
-data/raw/measurements.csv
-```
-
-Required fields follow `data/raw/measurements_template.csv`.
-
-## Run
-
-```bash
-# TODO: replace with the actual Ascend environment command.
-```
+- **测什么**：FP32向量乘法延迟 (cycles)
+- **怎么测**：与V1相同框架，Add替换为Mul
+- **为什么**：与V1对称，交叉验证乘加延迟
+- **运行**：`cd ubench/kernels && bash run.sh V2`
 
 ## Notes
-
 FP32 vector mul 依赖链；与 V1 使用相同计时框架

@@ -1,41 +1,17 @@
 # C3 矩阵乘流水线深度
 
 ## Measurement Target
-
 - Category: Cube Unit
 - Unit: 条
 - Priority: normal
 - Pattern: latency_vs_independent_tiles
+- Source code: `ubench/kernels/op_kernel/ubench.cpp` (mode=增加独立 tile matmul 数量，观察吞吐饱和点)
 
 ## Design
-
-- What to measure: TODO
-- How to measure: TODO
-- Why this isolates the target component: TODO
-
-## Parameters To Sweep
-
-- Problem size: TODO
-- Loop count: TODO
-- Number of independent dependency chains or streams: TODO
-- Warmup count and repeat count: TODO
-
-## Output
-
-Append raw records to:
-
-```text
-data/raw/measurements.csv
-```
-
-Required fields follow `data/raw/measurements_template.csv`.
-
-## Run
-
-```bash
-# TODO: replace with the actual Ascend environment command.
-```
+- **测什么**：Cube流水线深度 (条)
+- **怎么测**：增加连续Mmad数量(10~500)，观察吞吐饱和点
+- **为什么**：独立tile可并行进入流水线
+- **运行**：`cd ubench/kernels && bash run.sh C3`
 
 ## Notes
-
 增加独立 tile matmul 数量，观察吞吐饱和点

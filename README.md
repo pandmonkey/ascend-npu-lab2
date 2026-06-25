@@ -1,8 +1,8 @@
 # Lab2 Ascend NPU Microbenchmark
 
-本目录用于完成“并行与分布式导论 Lab2：昇腾 NPU 微基准测试设计”。
+本目录用于完成"并行与分布式导论 Lab2：昇腾 NPU 微基准测试设计"。
 
-当前阶段先完成不依赖昇腾卡的准备工作：作业要求提取、工程结构、参数清单、数据记录格式、报告骨架和脚本。真正的测量结果必须在昇腾 910B 或课程指定等价环境上采集。
+> **状态：已完成。** 21 个参数均已实现、运行、采集数据并生成报告。
 
 ## 目录结构
 
@@ -13,28 +13,38 @@
 ├── 作业要求提取.md
 ├── docs/
 │   ├── benchmark_manifest.csv
+│   ├── environment.md              # 实验环境
+│   ├── development_log.md           # 开发日志
+│   ├── measurement_methodology.md  # 测量方法论
 │   ├── preparation_plan.md
 │   └── remote_workflow.md
 ├── ubench/
 │   ├── README.md
-│   ├── S1_scalar_add_latency/
-│   ├── ...
-│   └── M8_mte_startup_overhead/
+│   ├── S1_*/ ... M8_*/             # 21 个参数目录（各含 README.md）
+│   └── kernels/                    # 统一 kernel 工程
+│       ├── op_kernel/ubench.cpp    # Ascend C kernel（21 种模式）
+│       ├── host/ubench_host.cpp    # ACL host launcher
+│       ├── CMakeLists.txt
+│       ├── build.sh / build_host.sh / run.sh
+│       └── host/query_platform.cpp # 平台参数查询工具
 ├── data/
 │   ├── raw/
-│   │   └── measurements_template.csv
+│   │   ├── measurements.csv        # 原始测量数据
+│   │   └── all_benchmarks.jsonl    # JSON 格式原始输出
 │   └── processed/
+│       ├── summary.csv             # 汇总结果
+│       └── plots/                  # ASCII 图表（每个参数一个 .txt）
 ├── scripts/
-│   ├── init_ubench_readmes.py
-│   ├── probe_ascend_env.sh
-│   ├── setup_env.sh
-│   ├── inspect_ascend_templates.sh
-│   ├── run_all.sh
-│   ├── run_one.sh
-│   ├── summarize_results.py
-│   └── validate_project.py
+│   ├── run_all_ubench.sh           # 全量 sweep 运行脚本
+│   ├── parse_results.py            # 数据解析 + 线性拟合
+│   ├── plot_results.py             # ASCII 图表生成
+│   ├── md_to_pdf.py                # Markdown → PDF
+│   ├── gen_ubench_readmes.py       # ubench 目录 README 生成
+│   ├── validate_project.py
+│   └── summarize_results.py
 └── report/
-    └── report.md
+    ├── report.md                   # 实验报告源文件
+    └── report.pdf                   # 最终报告
 ```
 
 ## 当前可做与不可做

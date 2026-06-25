@@ -1,5 +1,8 @@
 # 上机前准备计划
 
+> **状态：已完成。** 环境探测、kernel 开发、数据采集、报告生成和打包均已完成。
+> 实际开发过程见 [development_log.md](development_log.md)，环境详情见 [environment.md](environment.md)，测量方法论见 [measurement_methodology.md](measurement_methodology.md)。
+
 ## 需要先问清楚的问题
 
 这些问题不问清楚，后面很容易写出“本地看起来完整、上机完全跑不了”的代码。
