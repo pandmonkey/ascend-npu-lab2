@@ -126,15 +126,29 @@ def main():
         recs = [r for r in records if extract_pid(r.get('label','')) == pid and r.get('cycles_median',0) > 0]
         if recs:
             recs.sort(key=lambda r: r.get('chain', 0))
-            SOC_FREQ = 1.25e9
-            points = [(r.get('chain',0)/1024, r.get('chain',0)*r.get('iters',10)/r.get('cycles_median',1)*SOC_FREQ/1e9) for r in recs]
-            ascii_plot(pid, title, 'Data Size (KB)', 'Bandwidth (GB/s)', points)
+            SOC_FREQ = 1.65e9  # Ascend 910B AI Core frequency
+            if pid == 'M5':
+                # M5: chain = number of Mmad ops, each writes 16*16*4 = 1024 bytes
+                points = [(r.get('chain',0), r.get('chain',0)*1024*r.get('iters',20)/r.get('cycles_median',1)*SOC_FREQ/1e9) for r in recs]
+                ascii_plot(pid, title, 'Chain (Mmad count)', 'Bandwidth (GB/s)', points)
+            elif pid in ('M7',):
+                # M7: chain = bytes, show cycles/byte
+                points = [(r.get('chain',0)/1024, r.get('cycles_median',0)/r.get('chain',1)/r.get('iters',20)) for r in recs]
+                ascii_plot(pid, title, 'Data Size (KB)', 'Cycles/Byte', points)
+            elif pid == 'M8':
+                # M8: chain = bytes, show per-iter cycles
+                points = [(r.get('chain',0), r.get('cycles_median',0)/r.get('iters',20)) for r in recs]
+                ascii_plot(pid, title, 'Data Size (Bytes)', 'Cycles/Iter', points)
+            else:
+                # M1-M4: chain = bytes per transfer
+                points = [(r.get('chain',0)/1024, r.get('chain',0)*r.get('iters',20)/r.get('cycles_median',1)*SOC_FREQ/1e9) for r in recs]
+                ascii_plot(pid, title, 'Data Size (KB)', 'Bandwidth (GB/s)', points)
     
     # V4 pipeline depth
     recs = [r for r in records if extract_pid(r.get('label','')) == 'V4' and r.get('cycles_median',0) > 0]
     if recs:
         recs.sort(key=lambda r: r.get('streams', 1))
-        points = [(r.get('streams',1), r.get('streams',1)*r.get('chain',1000)/r.get('cycles_median',1)) for r in recs]
+        points = [(r.get('streams',1), r.get('streams',1)*r.get('chain',1000)*r.get('iters',20)/r.get('cycles_median',1)) for r in recs]
         ascii_plot('V4', 'Vector Pipeline Depth', 'Num Streams', 'Throughput (ops/cycle)', points)
     
     # C5 scaling
