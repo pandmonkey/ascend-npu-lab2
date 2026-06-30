@@ -66,13 +66,13 @@ case "$PID" in
         for sz in 16 32 48 64 96 128; do
             ./ubench_host --mode 13 --chain 100 --m $sz --n $sz --k $sz --iters 20 --repeat 10 --label "C5_${sz}x${sz}x${sz}"
         done;;
-    M1) # L1 read bandwidth
+    M1) # L1 read bandwidth - streaming GM->UB (large data to avoid L2 cache)
         for b in 1024 4096 16384 32768 65536 131072; do
-            ./ubench_host --mode 14 --chain $b --data 524288 --iters 20 --repeat 10 --label "M1_b${b}"
+            ./ubench_host --mode 14 --chain $b --data $((256 * 1024 * 1024)) --iters 20 --repeat 10 --label "M1_b${b}"
         done;;
-    M2) # L1 write bandwidth
+    M2) # L1 write bandwidth - streaming UB->GM (large data to avoid L2 cache)
         for b in 1024 4096 16384 32768 65536 131072; do
-            ./ubench_host --mode 15 --chain $b --data 524288 --iters 20 --repeat 10 --label "M2_b${b}"
+            ./ubench_host --mode 15 --chain $b --data $((256 * 1024 * 1024)) --iters 20 --repeat 10 --label "M2_b${b}"
         done;;
     M3) # L0A bandwidth (LoadData UB->L0A, chain = repetitions)
         for cl in 50 100 200 500 1000; do
@@ -82,7 +82,7 @@ case "$PID" in
         for cl in 50 100 200 500 1000; do
             ./ubench_host --mode 17 --chain $cl --data 524288 --iters 20 --repeat 10 --label "M4_cl${cl}"
         done;;
-    M5) # L0C bandwidth (via Mmad)
+    M5) # L0C readout bandwidth (Mmad + Fixpipe L0C->UB)
         for cl in 100 200 500 1000 2000; do
             ./ubench_host --mode 18 --chain $cl --data 524288 --iters 20 --repeat 10 --label "M5_cl${cl}"
         done;;

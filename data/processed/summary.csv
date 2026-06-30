@@ -1,7 +1,7 @@
 parameter_id,unit,count,measured_value,notes
 C1,cycles,5,1.5460,slope=30.9202 intercept=3.94 R²=1.0000
 C2,TMAC/s,4,223.0495,
-C3,条,11,2.0000,
+C3,条,11,17.0000,
 C4,cycles,15,1.2223,L0A=1.03 L0B=1.09 L0C=1.55
 C5,-,6,0.0000,
 M1,GB/s,6,5868.8955,
@@ -9,14 +9,14 @@ M2,GB/s,6,3223.0820,
 M3,GB/s,5,819.7167,
 M4,GB/s,5,774.1935,
 M5,GB/s,5,18500.9581,
-M6,cycles,4,0.3540,slope=7.0797 intercept=2880862.81 R²=0.4391
+M6,cycles,4,4.6009,
 M7,KB,12,192.0000,
 M8,cycles,9,5.7820,intercept=5.78 R²=0.7572
 S1,cycles,6,0.0909,slope=1.8180 intercept=7.84 R²=1.0000
 S2,ops/cycle,5,55.5816,slope=5.7573 intercept=15.96 R²=1.0000
-S3,cycles,4,0.3522,slope=7.0441 intercept=2900317.58 R²=0.4343
+S3,cycles,4,4.6215,
 V1,cycles,5,0.8181,slope=16.3617 intercept=10.78 R²=1.0000
 V2,cycles,5,0.8484,slope=16.9674 intercept=11.57 R²=1.0000
 V3,ops/cycle,5,1.3750,slope=58.1798 intercept=20.31 R²=1.0000
-V4,条,8,1.0000,slope=13937.1310 intercept=2438.54 R²=1.0000
+V4,条,8,1.0000,
 V5,cycles,8,0.8181,slope=16.3619 intercept=11.19 R²=1.0000

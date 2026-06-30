@@ -115,38 +115,37 @@ def compute_metric(param_id, records, all_groups=None):
     elif param_id in ('S3', 'M6'):
         # Pointer chasing latency.
         # kernel: for(iters) { for(chain) { p = idxGm[p]; } }
-        # v3: chain = number of chase steps (swept), working set fixed at 256MB.
-        # Linear fit on chainLen: slope/iters = per-chase latency.
+        # Chain = number of chase steps (swept), working set fixed at 256MB.
+        # Small chains hit L2 cache; large chains evict L2 and hit HBM.
+        # Use the largest chain point(s) with consistent iters for best estimate.
         vals = get_chain_cycles(records)
         if not vals:
             return None, '', {}
 
-        has_entries = any('_e' in r.get('label','') for r in records)
-        if has_entries:
-            # Legacy entry-based data: fixed chain, varying data size.
-            # Use simple division: per_chase = total_cycles / (iters * chain_steps)
-            best = vals[-1]  # last record = largest working set
-            c, cyc, r = best
-            chain_steps = c
+        # Compute per-chase for each data point
+        per_chase_data = []
+        for c, cyc, r in vals:
             iters = r.get('iters', 20)
-            per_chase = cyc / (iters * chain_steps)
-            stats = {'total_cycles': cyc, 'chain_steps': chain_steps, 'iters': iters,
-                     'note': 'entry-based sweep, may hit L2 cache'}
+            pc = cyc / (c * iters)
+            per_chase_data.append((c, cyc, iters, pc))
+
+        # Use the largest chain points (chain >= 10000) which are past L2 warm-up
+        large = [(c, cyc, it, pc) for c, cyc, it, pc in per_chase_data if c >= 10000]
+        if large:
+            # Use the point with the most total chases (chain * iters) for stability
+            best = max(large, key=lambda x: x[0] * x[2])
+            per_chase = best[3]
+            stats = {'chain': best[0], 'cycles': best[1], 'iters': best[2],
+                     'per_chase': per_chase,
+                     'all_data': [(c, cyc, it, pc) for c, cyc, it, pc in per_chase_data],
+                     'note': 'using largest chain for steady-state HBM latency'}
             return per_chase, 'cycles', stats
-        else:
-            # Chain-based sweep: linear fit on chain length
-            chains = [v[0] for v in vals]
-            cycles = [v[1] for v in vals]
-            iters = vals[0][2].get('iters', 20)
-            slope, intercept, r2 = linear_fit(chains, cycles)
-            if slope is not None:
-                per_chase = slope / iters
-                stats = {'slope': slope, 'intercept': intercept, 'r2': r2, 'iters': iters}
-                return per_chase, 'cycles', stats
-            # Fallback: simple division with largest chain
-            best = max(vals, key=lambda x: x[0])
-            c, cyc, r = best
-            return cyc / (c * iters), 'cycles', {}
+
+        # Fallback: simple division with largest chain
+        best = max(vals, key=lambda x: x[0])
+        c, cyc, r = best
+        iters = r.get('iters', 20)
+        return cyc / (c * iters), 'cycles', {}
 
     # === VECTOR ===
     elif param_id in ('V1', 'V2'):
@@ -183,11 +182,20 @@ def compute_metric(param_id, records, all_groups=None):
         return None, '', {}
 
     elif param_id == 'V4':
-        # Vector pipeline depth = V1_latency / throughput_interval.
-        # V4 sweeps N independent streams. All are independent (not dependent chains),
-        # so marginal cost per stream = throughput interval.
-        # V1 measures dependent chain latency.
-        # depth = latency / throughput_interval
+        # Vector pipeline depth.
+        # V4 kernel: N interleaved DEPENDENT chains (dN = dN + b each).
+        # Each chain step does N dependent adds on N different buffers.
+        # Total ops per chain step = N adds.
+        # Each chain of chainLen steps requires chainLen * latency cycles.
+        # With N <= pipeline_depth chains interleaved, the pipeline can overlap
+        # ops from different chains. Expected: time stays ~constant for N <= depth,
+        # then grows linearly for N > depth.
+        #
+        # Alternative: compute time_per_chain_per_step for each N.
+        # For N=1: time = chainLen * latency (all serial).
+        # For N>1: if N <= depth, time ≈ chainLen * latency (pipeline hides all).
+        #          if N > depth, time ≈ chainLen * (latency + (N-depth) * issue_interval).
+        # Depth = N where time/chainLen first exceeds N=1 time/chainLen significantly.
         vals = [(r.get('streams', r.get('numStreams', 1)),
                  r.get('cycles_median', 0), r) for r in records]
         vals = [(ns, cyc, r) for ns, cyc, r in vals if cyc > 0]
@@ -195,60 +203,38 @@ def compute_metric(param_id, records, all_groups=None):
         if not vals:
             return None, '', {}
 
-        # Compute cycles per op for each numStreams setting
-        per_op = []
+        # Key insight: with N dependent chains interleaved, each chain step
+        # adds N ops. The total cycles = chainLen * iters * max(N * issue_interval, latency).
+        # So cycles / (chainLen * iters) = per_step_time should be:
+        #   = latency for N <= depth (pipeline fully utilized)
+        #   = N * issue_interval for N > depth
+        # We measure "time per chain step" (not per op) to find the inflection.
+        per_step = []
         for ns, cyc, r in vals:
             chain = r.get('chain', 1000)
             iters = r.get('iters', 20)
-            total_ops = ns * chain * iters
-            cycles_per_op = cyc / total_ops if total_ops > 0 else float('inf')
-            per_op.append((ns, cycles_per_op, cyc))
+            step_time = cyc / (chain * iters)  # time per chain step (contains N ops)
+            per_step.append((ns, step_time, cyc))
 
-        # Linear fit on (ns, total_cycles) to get marginal cost per stream
-        nss = [p[0] for p in per_op]
-        cycs = [p[2] for p in per_op]
-        slope, intercept, r2 = linear_fit(nss, cycs)
+        # Method 1: Look for the first N where step_time significantly exceeds N=1 time
+        if per_step:
+            base_time = per_step[0][1]  # N=1 step time ≈ latency
+            depth_candidates = []
+            for ns, st, cyc in per_step:
+                ratio = st / base_time if base_time > 0 else 0
+                depth_candidates.append((ns, st, ratio))
 
-        # Get V1 latency for cross-parameter depth estimation
-        v1_latency = None
-        if all_groups and 'V1' in all_groups:
-            v1_val, _, _ = compute_metric('V1', all_groups['V1'], all_groups)
-            if v1_val is not None:
-                v1_latency = v1_val
+            # Depth = largest N where ratio < 1.15 (time stays within 15% of baseline)
+            depth = 1
+            for ns, st, ratio in depth_candidates:
+                if ratio < 1.15:
+                    depth = ns
 
-        if slope is not None and slope > 0:
-            chain = vals[0][2].get('chain', 1000)
-            iters = vals[0][2].get('iters', 20)
-            throughput_interval = slope / (chain * iters)  # cycles per add (throughput)
+            stats = {'per_step_data': [(ns, st, ratio) for ns, st, ratio in depth_candidates],
+                     'base_time': base_time, 'method': 'interleaved_dependent_chains'}
+            return depth, '条', stats
 
-            if v1_latency is not None and throughput_interval > 0:
-                # depth = latency / throughput_interval
-                depth = v1_latency / throughput_interval
-                stats = {'per_op_data': [(ns, cpo) for ns, cpo, _ in per_op],
-                         'slope': slope, 'intercept': intercept, 'r2': r2,
-                         'v1_latency': v1_latency,
-                         'throughput_interval': throughput_interval,
-                         'depth_formula': 'V1_latency / throughput_interval'}
-                return round(depth), '条', stats
-            else:
-                # Fallback: depth from intercept/slope
-                latency_single = slope + intercept
-                depth = latency_single / slope if slope > 0 else 1
-                stats = {'per_op_data': [(ns, cpo) for ns, cpo, _ in per_op],
-                         'slope': slope, 'intercept': intercept, 'r2': r2,
-                         'depth_estimate': depth}
-                return round(depth), '条', stats
-
-        # Fallback
-        min_cpo = min(p[1] for p in per_op)
-        depth = per_op[-1][0]
-        for ns, cpo, cyc in per_op:
-            if cpo <= min_cpo * 1.05:
-                depth = ns
-                break
-        stats = {'per_op_data': [(ns, cpo) for ns, cpo, _ in per_op],
-                 'min_cycles_per_op': min_cpo}
-        return float(depth), '条', stats
+        return None, '', {}
 
     elif param_id == 'V5':
         # Vector register latency (read+write combined).
@@ -316,41 +302,42 @@ def compute_metric(param_id, records, all_groups=None):
 
     elif param_id == 'C3':
         # Cube pipeline depth.
-        # Method: As chain increases, if chain <= pipeline_depth, all Mmads overlap
-        # and total cycles stay near-constant (~2 cycles). Once chain > depth,
-        # cycles grow linearly. The transition point = pipeline depth.
+        # Method: cross-parameter analysis using C1 (serialized Mmad latency)
+        # and C3 linear region (pipelined throughput).
+        # depth = C1_latency / C3_throughput_interval
         vals = get_chain_cycles(records)
         if not vals:
             return None, '', {}
 
-        # Look for the transition: where cycles jump from near-constant to linear growth.
-        # Specifically, find largest chain where cycles are still "near-constant" (< 10 cycles).
-        # The pipeline depth is approximately that chain length.
-        near_constant = [(c, cyc, r) for c, cyc, r in vals if cyc <= 10]
-        linear_growth = [(c, cyc, r) for c, cyc, r in vals if cyc > 10]
+        # Get C1 latency for cross-parameter depth estimation
+        c1_latency = None
+        if all_groups and 'C1' in all_groups:
+            c1_val, _, _ = compute_metric('C1', all_groups['C1'], all_groups)
+            if c1_val is not None:
+                c1_latency = c1_val
 
-        if near_constant and linear_growth:
-            # Pipeline depth ≈ largest chain with near-constant cycles
-            depth_chain = max(c for c, _, _ in near_constant)
-            # Verify: in the linear region, check slope is consistent with Mmad throughput
-            if len(linear_growth) >= 2:
-                lin_chains = [c for c, _, _ in linear_growth]
-                lin_cycles = [cyc for _, cyc, _ in linear_growth]
-                iters = linear_growth[0][2].get('iters', 20)
-                slope, intercept, r2 = linear_fit(lin_chains, lin_cycles)
-                stats = {'depth_chain': depth_chain,
-                         'linear_slope': slope, 'linear_intercept': intercept,
-                         'linear_r2': r2, 'iters': iters,
-                         'throughput_data': [(c, cyc) for c, cyc, _ in vals]}
-                if slope is not None:
-                    # cycles_per_mmad in linear region = slope/iters
-                    stats['cycles_per_mmad_linear'] = slope / iters
-            else:
-                stats = {'depth_chain': depth_chain,
-                         'throughput_data': [(c, cyc) for c, cyc, _ in vals]}
-            return float(depth_chain), '条', stats
+        # Linear fit on the stable region (chain >= 32) to get throughput interval
+        stable = [(c, cyc, r) for c, cyc, r in vals if c >= 32]
+        if len(stable) >= 2:
+            chains = [v[0] for v in stable]
+            cycles = [v[1] for v in stable]
+            iters = stable[0][2].get('iters', 20)
+            slope, intercept, r2 = linear_fit(chains, cycles)
 
-        # Fallback: compute throughput per chain length
+            if slope is not None and slope > 0:
+                throughput_interval = slope / iters  # cycles per Mmad in pipeline mode
+
+                if c1_latency is not None and throughput_interval > 0:
+                    depth = c1_latency / throughput_interval
+                    stats = {'c1_latency': c1_latency,
+                             'throughput_interval': throughput_interval,
+                             'linear_slope': slope, 'linear_intercept': intercept,
+                             'linear_r2': r2, 'iters': iters,
+                             'depth_formula': 'C1_latency / throughput_interval',
+                             'throughput_data': [(c, cyc) for c, cyc, _ in vals]}
+                    return round(depth), '条', stats
+
+        # Fallback: compute throughput per chain length, find saturation
         throughputs = []
         for c, cyc, r in vals:
             iters = r.get('iters', 20)
@@ -445,18 +432,22 @@ def compute_metric(param_id, records, all_groups=None):
         return bw_GBs, 'GB/s', stats
 
     elif param_id == 'M5':
-        # M5: L0C bandwidth via Mmad writes.
-        # chainLen = number of Mmad ops. Each Mmad(16,16,16) writes 16*16*4 = 1024 bytes to L0C.
+        # M5: L0C readout bandwidth via Fixpipe (L0C → UB).
+        # Kernel does Mmad+PipeBarrier+DataCopy(L0C→UB)+PipeBarrier per chain step.
+        # Each step reads M*N*sizeof(float) = 16*16*4 = 1024 bytes from L0C.
+        # BW = bytes_read / cycles * freq.
         vals = get_chain_cycles(records)
         if not vals:
             return None, '', {}
         best = max(vals, key=lambda x: x[0])
         c, cyc, r = best
         iters = r.get('iters', 20)
-        bytes_per_mmad = 16 * 16 * 4  # M*N*sizeof(float)
-        total_bytes = bytes_per_mmad * c * iters
+        bytes_per_step = 16 * 16 * 4  # M*N*sizeof(float) = 1024 bytes
+        total_bytes = bytes_per_step * c * iters
         bw_GBs = total_bytes / cyc * SOC_FREQ_HZ / 1e9
-        stats = {'chain': c, 'cycles': cyc, 'iters': iters, 'bytes_per_mmad': bytes_per_mmad}
+        stats = {'chain': c, 'cycles': cyc, 'iters': iters,
+                 'bytes_per_step': bytes_per_step,
+                 'note': 'L0C readout via Fixpipe (Mmad+DataCopy CO1->UB)'}
         return bw_GBs, 'GB/s', stats
 
     elif param_id == 'M6':
@@ -596,7 +587,7 @@ def main():
     print(f"  Parameter Summary (v2 - data-driven)")
     print(f"{'='*60}")
     for pid in sorted(groups.keys()):
-        val, unit_detail, stats = compute_metric(pid, groups[pid])
+        val, unit_detail, stats = compute_metric(pid, groups[pid], groups)
         unit = param_units.get(pid, unit_detail)
         val_str = f'{val:.4f}' if val is not None else 'N/A'
         r2_str = f" (R²={stats['r2']:.4f})" if 'r2' in stats and stats['r2'] is not None else ''

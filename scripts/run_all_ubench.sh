@@ -106,14 +106,16 @@ for sz in 16 32 48 64 96 128; do
 done
 
 # ==================== MTE (M1-M8) ====================
-# M1: L1 read bandwidth - GM->UB, sweep data size
+# M1: GM read bandwidth - streaming GM->UB to avoid L2 cache
+# Need large data buffer (>> 172MB L2). Use 256MB.
+# Each iter reads `bytes` from a different GM offset.
 for b in 1024 4096 16384 32768 65536 131072; do
-    run "M1_b${b}" 14 $b "--data 524288"
+    run "M1_b${b}" 14 $b "--data $((256 * 1024 * 1024))"
 done
 
-# M2: L1 write bandwidth - UB->GM, sweep data size
+# M2: GM write bandwidth - streaming UB->GM to avoid L2 cache
 for b in 1024 4096 16384 32768 65536 131072; do
-    run "M2_b${b}" 15 $b "--data 524288"
+    run "M2_b${b}" 15 $b "--data $((256 * 1024 * 1024))"
 done
 
 # M3: L0A bandwidth - LoadData UB->L0A, chain = number of LoadData calls
@@ -126,7 +128,7 @@ for cl in 50 100 200 500 1000; do
     run "M4_cl${cl}" 17 $cl "--data 524288"
 done
 
-# M5: L0C bandwidth - Mmad writes to L0C, sweep chain
+# M5: L0C readout bandwidth - Mmad + Fixpipe (L0C->UB), sweep chain
 for cl in 100 200 500 1000 2000; do
     run "M5_cl${cl}" 18 $cl "--data 524288"
 done

@@ -198,12 +198,16 @@ __global__ __aicore__ void ubench(GM_ADDR argsGM, GM_ADDR dataGM, GM_ADDR outGM)
         }
         case M_V4: {
             // V4: Vector pipeline depth measurement.
-            // Method: compare dependent chain latency vs independent chain latency.
-            //   - numStreams=1: single dependency chain Add(a,a,b) - measures latency
-            //   - numStreams=2..8: N independent chains, all with Add(dN,a,b)
-            // Pipeline depth = total_time(N independent) / total_time(1 dependent)
-            //   when N exceeds pipeline depth, time stops being constant.
-            // The host sweeps numStreams and computes: depth = latency/throughput_per_op
+            // Method: Keep total work constant (chain * iters adds), vary parallelism.
+            // - numStreams=1: single dependency chain Add(d0,d0,b) — measures latency
+            // - numStreams=N>1: N independent chains Add(dN,dN,b) each of length chain/N
+            //   If N < pipeline_depth: time ~ chain/N * latency = decreasing
+            //   If N >= pipeline_depth: time ~ chain * throughput = constant
+            // Pipeline depth = first N where time stops decreasing significantly.
+            //
+            // Alternative analysis: For independent ops, time per op should be
+            // throughput_interval. For dependent ops, time per op = latency.
+            // depth = latency / throughput_interval.
             uint32_t len = args.vecLen;
             uint32_t ns = args.numStreams;
             if (ns > 8) ns = 8;
@@ -229,6 +233,15 @@ __global__ __aicore__ void ubench(GM_ADDR argsGM, GM_ADDR dataGM, GM_ADDR outGM)
                 seedGm.SetGlobalBuffer((__gm__ float *)dataGM);
                 DataCopy(a, seedGm, len);
                 DataCopy(b, seedGm[len], len);
+                // Initialize all d buffers with data from GM to prevent optimization
+                DataCopy(d0, seedGm, len);
+                DataCopy(d1, seedGm, len);
+                DataCopy(d2, seedGm, len);
+                DataCopy(d3, seedGm, len);
+                DataCopy(d4, seedGm, len);
+                DataCopy(d5, seedGm, len);
+                DataCopy(d6, seedGm, len);
+                DataCopy(d7, seedGm, len);
             }
             GlobalTensor<float> accGm;
             accGm.SetGlobalBuffer((__gm__ float *)outGM);
@@ -236,73 +249,76 @@ __global__ __aicore__ void ubench(GM_ADDR argsGM, GM_ADDR dataGM, GM_ADDR outGM)
             // Warmup
             for (uint32_t w = 0; w < args.warmup; ++w)
                 for (uint32_t i = 0; i < args.chainLen; ++i)
-                    Add<float>(d0, a, b, len);
+                    Add<float>(d0, d0, b, len);
 
-            // Use switch to avoid runtime if-branches inside hot loop.
-            // Each case unrolls exactly N adds per loop iteration.
+            // Each case: N DEPENDENT chains interleaved.
+            // With N streams, each stream has a dependency chain: dN = dN + b.
+            // Instructions from different streams can overlap in the pipeline.
+            // Total ops = N * chainLen * iters (same # of ops per stream).
             start = asc_get_system_cycle();
             switch (ns) {
             case 1:
                 for (uint32_t it = 0; it < args.iters; ++it)
                     for (uint32_t i = 0; i < args.chainLen; ++i)
-                        Add<float>(d0, a, b, len);
+                        Add<float>(d0, d0, b, len);
                 break;
             case 2:
                 for (uint32_t it = 0; it < args.iters; ++it)
                     for (uint32_t i = 0; i < args.chainLen; ++i) {
-                        Add<float>(d0, a, b, len); Add<float>(d1, a, b, len);
+                        Add<float>(d0, d0, b, len); Add<float>(d1, d1, b, len);
                     }
                 break;
             case 3:
                 for (uint32_t it = 0; it < args.iters; ++it)
                     for (uint32_t i = 0; i < args.chainLen; ++i) {
-                        Add<float>(d0, a, b, len); Add<float>(d1, a, b, len);
-                        Add<float>(d2, a, b, len);
+                        Add<float>(d0, d0, b, len); Add<float>(d1, d1, b, len);
+                        Add<float>(d2, d2, b, len);
                     }
                 break;
             case 4:
                 for (uint32_t it = 0; it < args.iters; ++it)
                     for (uint32_t i = 0; i < args.chainLen; ++i) {
-                        Add<float>(d0, a, b, len); Add<float>(d1, a, b, len);
-                        Add<float>(d2, a, b, len); Add<float>(d3, a, b, len);
+                        Add<float>(d0, d0, b, len); Add<float>(d1, d1, b, len);
+                        Add<float>(d2, d2, b, len); Add<float>(d3, d3, b, len);
                     }
                 break;
             case 5:
                 for (uint32_t it = 0; it < args.iters; ++it)
                     for (uint32_t i = 0; i < args.chainLen; ++i) {
-                        Add<float>(d0, a, b, len); Add<float>(d1, a, b, len);
-                        Add<float>(d2, a, b, len); Add<float>(d3, a, b, len);
-                        Add<float>(d4, a, b, len);
+                        Add<float>(d0, d0, b, len); Add<float>(d1, d1, b, len);
+                        Add<float>(d2, d2, b, len); Add<float>(d3, d3, b, len);
+                        Add<float>(d4, d4, b, len);
                     }
                 break;
             case 6:
                 for (uint32_t it = 0; it < args.iters; ++it)
                     for (uint32_t i = 0; i < args.chainLen; ++i) {
-                        Add<float>(d0, a, b, len); Add<float>(d1, a, b, len);
-                        Add<float>(d2, a, b, len); Add<float>(d3, a, b, len);
-                        Add<float>(d4, a, b, len); Add<float>(d5, a, b, len);
+                        Add<float>(d0, d0, b, len); Add<float>(d1, d1, b, len);
+                        Add<float>(d2, d2, b, len); Add<float>(d3, d3, b, len);
+                        Add<float>(d4, d4, b, len); Add<float>(d5, d5, b, len);
                     }
                 break;
             case 7:
                 for (uint32_t it = 0; it < args.iters; ++it)
                     for (uint32_t i = 0; i < args.chainLen; ++i) {
-                        Add<float>(d0, a, b, len); Add<float>(d1, a, b, len);
-                        Add<float>(d2, a, b, len); Add<float>(d3, a, b, len);
-                        Add<float>(d4, a, b, len); Add<float>(d5, a, b, len);
-                        Add<float>(d6, a, b, len);
+                        Add<float>(d0, d0, b, len); Add<float>(d1, d1, b, len);
+                        Add<float>(d2, d2, b, len); Add<float>(d3, d3, b, len);
+                        Add<float>(d4, d4, b, len); Add<float>(d5, d5, b, len);
+                        Add<float>(d6, d6, b, len);
                     }
                 break;
             default: // 8
                 for (uint32_t it = 0; it < args.iters; ++it)
                     for (uint32_t i = 0; i < args.chainLen; ++i) {
-                        Add<float>(d0, a, b, len); Add<float>(d1, a, b, len);
-                        Add<float>(d2, a, b, len); Add<float>(d3, a, b, len);
-                        Add<float>(d4, a, b, len); Add<float>(d5, a, b, len);
-                        Add<float>(d6, a, b, len); Add<float>(d7, a, b, len);
+                        Add<float>(d0, d0, b, len); Add<float>(d1, d1, b, len);
+                        Add<float>(d2, d2, b, len); Add<float>(d3, d3, b, len);
+                        Add<float>(d4, d4, b, len); Add<float>(d5, d5, b, len);
+                        Add<float>(d6, d6, b, len); Add<float>(d7, d7, b, len);
                     }
                 break;
             }
             accGm.SetValue(0, d0.GetValue(0));
+            accGm.SetValue(1, d7.GetValue(0));
             end = asc_get_system_cycle();
             total = end - start;
             break;
@@ -526,13 +542,13 @@ __global__ __aicore__ void ubench(GM_ADDR argsGM, GM_ADDR dataGM, GM_ADDR outGM)
 
         // ==================== MTE ====================
         case M_M1:
-        case M_M2:
-        case M_M8: {
-            // M1: L1 read bandwidth (GM -> UB, as proxy for L1 read since
-            //     GM->UB goes through L2/L1 path).
-            // M2: L1 write bandwidth (UB -> GM).
-            // M8: MTE startup overhead (small transfers, fit intercept).
-            // chainLen = bytes per transfer.
+        case M_M2: {
+            // M1: GM read bandwidth (GM -> UB), streaming to avoid L2 cache.
+            // M2: GM write bandwidth (UB -> GM), streaming to avoid L2 cache.
+            // Strategy: Use a large GM buffer (>> L2 = 172MB), and access
+            // different offsets each iteration to prevent L2 caching.
+            // chainLen = bytes per transfer per iteration.
+            // iters iterations, each accessing offset = (i * stride) in GM.
             uint32_t bytes = args.chainLen;
             uint32_t maxUbBytes = 128 * 1024;
             if (bytes > maxUbBytes) bytes = maxUbBytes;
@@ -546,33 +562,74 @@ __global__ __aicore__ void ubench(GM_ADDR argsGM, GM_ADDR dataGM, GM_ADDR outGM)
             GlobalTensor<float> accGm; accGm.SetGlobalBuffer((__gm__ float *)outGM);
             Duplicate<float>(ub, 1.0f, elems);
 
-            if (args.mode == M_M1 || args.mode == M_M8) {
-                // Read: GM -> UB
+            // Stride in float elements — spread accesses across the full GM buffer
+            // to bypass L2 cache. With 256MB data buffer and 20 iters,
+            // stride = dataSize / (iters + warmup) to cover the full buffer.
+            // This ensures each iteration touches cold memory.
+            uint32_t total_iters = args.iters + args.warmup;
+            uint32_t data_elems = 64 * 1024 * 1024;  // assume 256MB = 64M floats
+            uint32_t stride_elems = data_elems / (total_iters + 1);
+            if (stride_elems < elems) stride_elems = elems;
+
+            if (args.mode == M_M1) {
+                // Read: GM -> UB, streaming through different regions
                 for (uint32_t w = 0; w < args.warmup; ++w) {
-                    DataCopy(ub, gmF, elems);
+                    DataCopy(ub, gmF[w * stride_elems], elems);
                     PipeBarrier<PIPE_ALL>();
                 }
                 start = asc_get_system_cycle();
                 for (uint32_t it = 0; it < args.iters; ++it) {
-                    DataCopy(ub, gmF, elems);
+                    // Offset past warmup region to avoid L2 hits from warmup
+                    DataCopy(ub, gmF[(args.warmup + it) * stride_elems], elems);
                     PipeBarrier<PIPE_ALL>();
                 }
                 accGm.SetValue(0, ub.GetValue(0));
                 end = asc_get_system_cycle();
             } else {
-                // Write: UB -> GM
+                // Write: UB -> GM, streaming through different regions
                 for (uint32_t w = 0; w < args.warmup; ++w) {
-                    DataCopy(gmF, ub, elems);
+                    DataCopy(gmF[w * stride_elems], ub, elems);
                     PipeBarrier<PIPE_ALL>();
                 }
                 start = asc_get_system_cycle();
                 for (uint32_t it = 0; it < args.iters; ++it) {
-                    DataCopy(gmF, ub, elems);
+                    DataCopy(gmF[(args.warmup + it) * stride_elems], ub, elems);
                     PipeBarrier<PIPE_ALL>();
                 }
                 accGm.SetValue(0, ub.GetValue(0));
                 end = asc_get_system_cycle();
             }
+            total = end - start;
+            break;
+        }
+        case M_M8: {
+            // M8: MTE startup overhead (small transfers, fit intercept).
+            // Keep original non-streaming method since we need small data.
+            uint32_t bytes = args.chainLen;
+            uint32_t maxUbBytes = 128 * 1024;
+            if (bytes > maxUbBytes) bytes = maxUbBytes;
+            uint32_t elems = bytes / sizeof(float);
+            if (elems == 0) elems = 1;
+            TBuf tBuf;
+            pipe.InitBuffer(tBuf, elems * sizeof(float));
+            auto ub = tBuf.Get<float>();
+            GlobalTensor<float> gmF;
+            gmF.SetGlobalBuffer((__gm__ float *)dataGM);
+            GlobalTensor<float> accGm; accGm.SetGlobalBuffer((__gm__ float *)outGM);
+            Duplicate<float>(ub, 1.0f, elems);
+
+            // Read: GM -> UB (small data, L2 cached is OK for startup measurement)
+            for (uint32_t w = 0; w < args.warmup; ++w) {
+                DataCopy(ub, gmF, elems);
+                PipeBarrier<PIPE_ALL>();
+            }
+            start = asc_get_system_cycle();
+            for (uint32_t it = 0; it < args.iters; ++it) {
+                DataCopy(ub, gmF, elems);
+                PipeBarrier<PIPE_ALL>();
+            }
+            accGm.SetValue(0, ub.GetValue(0));
+            end = asc_get_system_cycle();
             total = end - start;
             break;
         }
@@ -654,15 +711,19 @@ __global__ __aicore__ void ubench(GM_ADDR argsGM, GM_ADDR dataGM, GM_ADDR outGM)
             break;
         }
         case M_M5: {
-            // M5: L0C bandwidth. Measure Mmad write to L0C as proxy.
-            // L0C is only written by Mmad and read by Fixpipe.
-            // We measure repeated Mmad (16x16x16) writes to L0C.
+            // M5: L0C readout bandwidth via Fixpipe (L0C → UB).
+            // L0C is only written by Mmad and read by Fixpipe (DataCopy CO1→VECCALC).
+            // We measure: Mmad writes L0C, then DataCopy reads L0C back to UB.
+            // The readout bandwidth = bytes_read / cycles * freq.
+            // Each readout: 16*16*sizeof(float) = 1024 bytes from L0C.
             uint32_t M = 16, N = 16, K = 16;
-            TBuf<TPosition::VECCALC> tA1, tB1;
+            TBuf<TPosition::VECCALC> tA1, tB1, tUBout;
             pipe.InitBuffer(tA1, M*K*sizeof(half));
             pipe.InitBuffer(tB1, K*N*sizeof(half));
+            pipe.InitBuffer(tUBout, M*N*sizeof(float));
             auto aL1 = tA1.Get<half>();
             auto bL1 = tB1.Get<half>();
+            auto ubOut = tUBout.Get<float>();
             {
                 GlobalTensor<half> seedGm;
                 seedGm.SetGlobalBuffer((__gm__ half *)dataGM);
@@ -686,17 +747,25 @@ __global__ __aicore__ void ubench(GM_ADDR argsGM, GM_ADDR dataGM, GM_ADDR outGM)
             LoadData<half>(bL0, bL1, ldParams);
 
             uint32_t chain = args.chainLen;
-            for (uint32_t w = 0; w < args.warmup; ++w)
-                for (uint32_t i = 0; i < chain; ++i)
-                    Mmad<float,half,half>(cL0,aL0,bL0,mmParams);
+            // Warmup
+            for (uint32_t w = 0; w < args.warmup; ++w) {
+                Mmad<float,half,half>(cL0,aL0,bL0,mmParams);
+                PipeBarrier<PIPE_ALL>();
+                DataCopy(ubOut, cL0, M*N);
+                PipeBarrier<PIPE_ALL>();
+            }
+            // Measure: Mmad + Fixpipe readout chain
             start = asc_get_system_cycle();
             for (uint32_t it = 0; it < args.iters; ++it)
-                for (uint32_t i = 0; i < chain; ++i)
+                for (uint32_t i = 0; i < chain; ++i) {
                     Mmad<float,half,half>(cL0,aL0,bL0,mmParams);
-            accGm.SetValue(0, cL0.GetValue(0));
+                    PipeBarrier<PIPE_ALL>();
+                    DataCopy(ubOut, cL0, M*N);
+                    PipeBarrier<PIPE_ALL>();
+                }
+            accGm.SetValue(0, ubOut.GetValue(0));
             end = asc_get_system_cycle();
-            // L0C bytes written per Mmad = M*N*4 (float32 output)
-            // Total bytes = M*N*4 * chain * iters
+            // Total bytes read from L0C = M*N*4 * chain * iters
             // Host computes: BW = total_bytes / cycles * freq
             total = end - start;
             break;

@@ -103,14 +103,20 @@ int main(int argc, char** argv) {
     aclrtMalloc(&outGM, 4096, ACL_MEM_MALLOC_HUGE_FIRST);
 
     // For S3/M6 pointer chasing, build a permutation chain in dataGM.
+    // IMPORTANT: The array size = dataBytes/4 (e.g., 64M entries = 256MB),
+    // NOT chainLen. chainLen only controls how many chase steps to perform.
+    // The working set must be >> L2 (172MB) to measure real HBM latency.
     if(c.mode==MODE_S3||c.mode==MODE_M6){
-        uint32_t n = c.chainLen;
+        uint32_t n = (uint32_t)(allocBytes / sizeof(uint32_t));
+        if(n < 2) n = 2;
+        fprintf(stderr, "[S3/M6] Building permutation chain: %u entries (%.1f MB working set), %u chase steps\n",
+                n, (double)n*4/1e6, c.chainLen);
         std::vector<uint32_t> idx(n);
         for(uint32_t i=0;i<n;i++)idx[i]=i;
         // shuffle deterministically to defeat prefetch
         unsigned int seed=12345;
         for(uint32_t i=n-1;i>0;i--){uint32_t r=rand_r(&seed)%(i+1);std::swap(idx[i],idx[r]);}
-        // make it a single cycle
+        // make it a single cycle (Hamiltonian cycle through all n entries)
         std::vector<uint32_t> pos(n);
         for(uint32_t i=0;i<n;i++)pos[idx[i]]=i;
         std::vector<uint32_t> chain(n);
