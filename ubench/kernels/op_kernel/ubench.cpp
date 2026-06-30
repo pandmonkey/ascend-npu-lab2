@@ -579,11 +579,9 @@ __global__ __aicore__ void ubench(GM_ADDR argsGM, GM_ADDR dataGM, GM_ADDR outGM)
         case M_M3: {
             // M3: L0A bandwidth. Measure LoadData (UB -> L0A) throughput.
             // Use half type (Cube input format for L0A).
-            uint32_t bytes = args.chainLen;
-            uint32_t maxL0ABytes = 64 * 1024;
-            if (bytes > maxL0ABytes) bytes = maxL0ABytes;
-            uint32_t elems = bytes / sizeof(half);
-            if (elems < 256) elems = 256;  // minimum for LoadData
+            // chainLen = number of LoadData calls per iter (for sweeping).
+            uint32_t bytes = 16 * 16 * sizeof(half);  // Fixed 16x16 tile = 512 bytes
+            uint32_t elems = bytes / sizeof(half);     // 256 elements
 
             TBuf<TPosition::VECCALC> tSrc;
             pipe.InitBuffer(tSrc, elems * sizeof(half));
@@ -600,26 +598,28 @@ __global__ __aicore__ void ubench(GM_ADDR argsGM, GM_ADDR dataGM, GM_ADDR outGM)
             ldParams.repeatTimes = 1;
             GlobalTensor<float> accGm; accGm.SetGlobalBuffer((__gm__ float *)outGM);
 
-            for (uint32_t w = 0; w < args.warmup; ++w) {
-                LoadData<half>(dst, src, ldParams);
-                PipeBarrier<PIPE_ALL>();
-            }
+            uint32_t chain = args.chainLen;
+            for (uint32_t w = 0; w < args.warmup; ++w)
+                for (uint32_t i = 0; i < chain; ++i) {
+                    LoadData<half>(dst, src, ldParams);
+                    PipeBarrier<PIPE_ALL>();
+                }
             start = asc_get_system_cycle();
-            for (uint32_t it = 0; it < args.iters; ++it) {
-                LoadData<half>(dst, src, ldParams);
-                PipeBarrier<PIPE_ALL>();
-            }
+            for (uint32_t it = 0; it < args.iters; ++it)
+                for (uint32_t i = 0; i < chain; ++i) {
+                    LoadData<half>(dst, src, ldParams);
+                    PipeBarrier<PIPE_ALL>();
+                }
             end = asc_get_system_cycle();
+            // Total bytes = 512 * chain * iters
             total = end - start;
             break;
         }
         case M_M4: {
             // M4: L0B bandwidth. Measure LoadData (UB -> L0B) throughput.
-            uint32_t bytes = args.chainLen;
-            uint32_t maxL0BBytes = 64 * 1024;
-            if (bytes > maxL0BBytes) bytes = maxL0BBytes;
-            uint32_t elems = bytes / sizeof(half);
-            if (elems < 256) elems = 256;
+            // chainLen = number of LoadData calls per iter.
+            uint32_t bytes = 16 * 16 * sizeof(half);  // Fixed 16x16 tile = 512 bytes
+            uint32_t elems = bytes / sizeof(half);     // 256 elements
 
             TBuf<TPosition::VECCALC> tSrc;
             pipe.InitBuffer(tSrc, elems * sizeof(half));
@@ -636,16 +636,20 @@ __global__ __aicore__ void ubench(GM_ADDR argsGM, GM_ADDR dataGM, GM_ADDR outGM)
             ldParams.repeatTimes = 1;
             GlobalTensor<float> accGm; accGm.SetGlobalBuffer((__gm__ float *)outGM);
 
-            for (uint32_t w = 0; w < args.warmup; ++w) {
-                LoadData<half>(dst, src, ldParams);
-                PipeBarrier<PIPE_ALL>();
-            }
+            uint32_t chain = args.chainLen;
+            for (uint32_t w = 0; w < args.warmup; ++w)
+                for (uint32_t i = 0; i < chain; ++i) {
+                    LoadData<half>(dst, src, ldParams);
+                    PipeBarrier<PIPE_ALL>();
+                }
             start = asc_get_system_cycle();
-            for (uint32_t it = 0; it < args.iters; ++it) {
-                LoadData<half>(dst, src, ldParams);
-                PipeBarrier<PIPE_ALL>();
-            }
+            for (uint32_t it = 0; it < args.iters; ++it)
+                for (uint32_t i = 0; i < chain; ++i) {
+                    LoadData<half>(dst, src, ldParams);
+                    PipeBarrier<PIPE_ALL>();
+                }
             end = asc_get_system_cycle();
+            // Total bytes = 512 * chain * iters
             total = end - start;
             break;
         }

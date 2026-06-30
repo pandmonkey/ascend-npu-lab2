@@ -36,11 +36,14 @@ for cl in 500 1000 2000 4000 8000; do
 done
 
 # S3: scalar memory latency - pointer chasing
-# Working set must be >> 172MB L2. Use chain=64M entries = 256MB.
-# But limit each chase to avoid timeout; use fewer chase steps with large arrays.
-for entries in 1000000 4000000 16000000 64000000; do
-    run "S3_e${entries}" 3 1000 "--data $((entries * 4 + 4096))"
+# Working set must be >> 172MB L2. Use chain = large number of chases.
+# With 64M entries (256MB), need many chases to measure cold-miss latency.
+# Use fewer iters for larger chains to avoid timeout.
+for cl in 1000 10000 100000; do
+    run "S3_cl${cl}" 3 $cl "--data $((64000000 * 4 + 4096))"
 done
+# Larger chain with fewer iters
+run "S3_cl1000000" 3 1000000 "--data $((64000000 * 4 + 4096)) --iters 2"
 
 # ==================== VECTOR (V1-V5) ====================
 # V1: vector add latency - dependency chain sweep
@@ -113,14 +116,14 @@ for b in 1024 4096 16384 32768 65536 131072; do
     run "M2_b${b}" 15 $b "--data 524288"
 done
 
-# M3: L0A bandwidth - LoadData UB->L0A (half precision)
-for b in 512 1024 4096 16384 32768 65536; do
-    run "M3_b${b}" 16 $b "--data 524288"
+# M3: L0A bandwidth - LoadData UB->L0A, chain = number of LoadData calls
+for cl in 50 100 200 500 1000; do
+    run "M3_cl${cl}" 16 $cl "--data 524288"
 done
 
-# M4: L0B bandwidth - LoadData UB->L0B (half precision)
-for b in 512 1024 4096 16384 32768 65536; do
-    run "M4_b${b}" 17 $b "--data 524288"
+# M4: L0B bandwidth - LoadData UB->L0B, chain = number of LoadData calls
+for cl in 50 100 200 500 1000; do
+    run "M4_cl${cl}" 17 $cl "--data 524288"
 done
 
 # M5: L0C bandwidth - Mmad writes to L0C, sweep chain
@@ -129,10 +132,11 @@ for cl in 100 200 500 1000 2000; do
 done
 
 # M6: HBM memory latency - pointer chasing with large working set
-# Need working set >> 172MB L2.
-for entries in 1000000 4000000 16000000 64000000; do
-    run "M6_e${entries}" 19 1000 "--data $((entries * 4 + 4096))"
+# Need working set >> 172MB L2. Use 256MB array with many chase steps.
+for cl in 1000 10000 100000; do
+    run "M6_cl${cl}" 19 $cl "--data $((64000000 * 4 + 4096))"
 done
+run "M6_cl1000000" 19 1000000 "--data $((64000000 * 4 + 4096)) --iters 2"
 
 # M7: buffer capacity sweep
 for b in 1024 2048 4096 8192 16384 32768 65536 98304 131072 163840 196608 262144; do

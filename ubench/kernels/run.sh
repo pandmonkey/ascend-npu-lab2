@@ -18,10 +18,12 @@ case "$PID" in
         for cl in 500 1000 2000 4000 8000; do
             ./ubench_host --mode 2 --chain $cl --iters 20 --repeat 10 --label "S2_cl${cl}"
         done;;
-    S3) # Scalar memory latency - pointer chasing
-        for entries in 1000000 4000000 16000000 64000000; do
-            ./ubench_host --mode 3 --chain 1000 --data $((entries * 4 + 4096)) --iters 20 --repeat 10 --label "S3_e${entries}"
-        done;;
+    S3) # Scalar memory latency - pointer chasing (256MB working set)
+        for cl in 1000 10000 100000; do
+            ./ubench_host --mode 3 --chain $cl --data $((64000000 * 4 + 4096)) --iters 20 --repeat 10 --label "S3_cl${cl}"
+        done
+        ./ubench_host --mode 3 --chain 1000000 --data $((64000000 * 4 + 4096)) --iters 2 --repeat 10 --label "S3_cl1000000"
+        ;;
     V1) # FP32 vector add latency
         for cl in 200 500 1000 2000 4000; do
             ./ubench_host --mode 4 --chain $cl --veclen 64 --iters 20 --repeat 10 --label "V1_cl${cl}"
@@ -72,22 +74,24 @@ case "$PID" in
         for b in 1024 4096 16384 32768 65536 131072; do
             ./ubench_host --mode 15 --chain $b --data 524288 --iters 20 --repeat 10 --label "M2_b${b}"
         done;;
-    M3) # L0A bandwidth (LoadData UB->L0A)
-        for b in 512 1024 4096 16384 32768 65536; do
-            ./ubench_host --mode 16 --chain $b --data 524288 --iters 20 --repeat 10 --label "M3_b${b}"
+    M3) # L0A bandwidth (LoadData UB->L0A, chain = repetitions)
+        for cl in 50 100 200 500 1000; do
+            ./ubench_host --mode 16 --chain $cl --data 524288 --iters 20 --repeat 10 --label "M3_cl${cl}"
         done;;
-    M4) # L0B bandwidth (LoadData UB->L0B)
-        for b in 512 1024 4096 16384 32768 65536; do
-            ./ubench_host --mode 17 --chain $b --data 524288 --iters 20 --repeat 10 --label "M4_b${b}"
+    M4) # L0B bandwidth (LoadData UB->L0B, chain = repetitions)
+        for cl in 50 100 200 500 1000; do
+            ./ubench_host --mode 17 --chain $cl --data 524288 --iters 20 --repeat 10 --label "M4_cl${cl}"
         done;;
     M5) # L0C bandwidth (via Mmad)
         for cl in 100 200 500 1000 2000; do
             ./ubench_host --mode 18 --chain $cl --data 524288 --iters 20 --repeat 10 --label "M5_cl${cl}"
         done;;
-    M6) # HBM memory latency
-        for entries in 1000000 4000000 16000000 64000000; do
-            ./ubench_host --mode 19 --chain 1000 --data $((entries * 4 + 4096)) --iters 20 --repeat 10 --label "M6_e${entries}"
-        done;;
+    M6) # HBM memory latency (256MB working set)
+        for cl in 1000 10000 100000; do
+            ./ubench_host --mode 19 --chain $cl --data $((64000000 * 4 + 4096)) --iters 20 --repeat 10 --label "M6_cl${cl}"
+        done
+        ./ubench_host --mode 19 --chain 1000000 --data $((64000000 * 4 + 4096)) --iters 2 --repeat 10 --label "M6_cl1000000"
+        ;;
     M7) # Buffer capacity sweep
         for b in 1024 2048 4096 8192 16384 32768 65536 98304 131072 163840 196608 262144; do
             ./ubench_host --mode 20 --chain $b --data 524288 --iters 20 --repeat 10 --label "M7_b${b}"
